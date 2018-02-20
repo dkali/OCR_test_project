@@ -167,55 +167,7 @@ namespace OCR
         // Whether we care about this contour
         public bool keep(Emgu.CV.Util.VectorOfPoint contour)
         {
-            return keepBox(contour) && connected(contour);
-        }
-
-        // Whether we should keep the containing box of this
-        // contour based on it's shape
-        public bool keepBox(Emgu.CV.Util.VectorOfPoint contour)
-        {
-            Rectangle rect = CvInvoke.BoundingRectangle(contour);
-
-            // width and height need to be floats
-            rect.Width *= 1;
-            rect.Height *= 1;
-
-            if (rect.Height == 0)
-            {
-                Console.WriteLine("Rejected because of zero height");
-                return false;
-            }
-
-            // Test it's shape - if it's too oblong or tall it's
-            // probably not a real character
-            if ((rect.Width / rect.Height < 0.1) || (rect.Width / rect.Height > 10))
-            {
-                Console.WriteLine("Rejected because of shape: (" +
-                    rect.X.ToString() + "," +
-                    rect.Y.ToString() + "," +
-                    rect.Width.ToString() + "," +
-                    rect.Height.ToString() + ")" +
-                    (rect.Width / rect.Height).ToString());
-                return false;
-            }
-
-            // check size of the box
-            if (((rect.Width * rect.Height) > ((mSizeX * mSizeY) / 5)) || ((rect.Width * rect.Height) < 15))
-            {
-                Console.WriteLine("Rejected because of size");
-                return false;
-            }
-
-            return true;
-        }
-
-        // A quick test to check whether the contour is
-        // a connected shape
-        public bool connected(Emgu.CV.Util.VectorOfPoint contour)
-        {
-            Point first = contour[0];
-            Point last = contour[contour.Size - 1];
-            return ((Math.Abs(first.X - last.X) <= 1) && (Math.Abs(first.Y - last.Y) <= 1));
+            return CvInvoke.ArcLength(contour, true) > (mSizeX + mSizeY) / 5 ? false : true;
         }
 
         // Get the first parent of the contour that we care about
@@ -265,9 +217,7 @@ namespace OCR
 
         public Image<Bgr, Byte> processImage()
         {
-            CvInvoke.PyrDown(mLoadedImage, mLoadedImage); // Resize image for debug purposes
             CvInvoke.Imshow("Source", mLoadedImage);
-            CvInvoke.GaussianBlur(mLoadedImage, mLoadedImage, new Size(3, 3), 0.5);
 
             // Split out each channel
             Mat[] channels = mLoadedImage.Split();
@@ -276,9 +226,11 @@ namespace OCR
             Mat blueEdges = new Mat();
             Mat greenEdges = new Mat();
             Mat redEdges = new Mat();
-            CvInvoke.Canny(channels[0], blueEdges, 200, 250);
-            CvInvoke.Canny(channels[1], greenEdges, 200, 250);
-            CvInvoke.Canny(channels[2], redEdges, 200, 250);
+            int lowThresh = 200;
+            int highThresh = 250;
+            CvInvoke.Canny(channels[0], blueEdges, lowThresh, highThresh);
+            CvInvoke.Canny(channels[1], greenEdges, lowThresh, highThresh);
+            CvInvoke.Canny(channels[2], redEdges, lowThresh, highThresh);
 
             // Join edges back into image
             CvInvoke.BitwiseOr(blueEdges, greenEdges, blueEdges);
