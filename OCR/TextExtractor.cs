@@ -21,6 +21,8 @@ namespace OCR
         Mat mLoadedImage;
         Image<Bgr, Byte> mImg;
 
+        private Tesseract mTesseract;
+
         public TextExtractor(string path)
         {
             // Load the image
@@ -94,13 +96,13 @@ namespace OCR
         }
 
         // Count the number of relevant siblings of a contour
-        public int count_siblings(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour, bool inc_children = false)
+        public int countSiblings(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour, bool incChildren = false)
         {
             int count = 0;
             // Include the children if necessary
-            if (inc_children)
+            if (incChildren)
             {
-                count = count_children(index, h_, contour);
+                count = countChildren(index, h_, contour);
             }
             else
             {
@@ -115,9 +117,9 @@ namespace OCR
                 {
                     count += 1;
                 }
-                if (inc_children)
+                if (incChildren)
                 {
-                    count += count_children(p_, h_, contour);
+                    count += countChildren(p_, h_, contour);
                 }
                 p_ = GetHierarchy(h_, p_)[0];
             }
@@ -130,9 +132,9 @@ namespace OCR
                 {
                     count += 1;
                 }
-                if (inc_children)
+                if (incChildren)
                 {
-                    count += count_children(n, h_, contour);
+                    count += countChildren(n, h_, contour);
                 }
                 n = GetHierarchy(h_, n)[1];
             }
@@ -140,7 +142,7 @@ namespace OCR
         }
 
         // Count the number of real children
-        public int count_children(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour)
+        public int countChildren(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour)
         {
             int count = 0;
             // No children
@@ -160,7 +162,7 @@ namespace OCR
             }
 
             // Also count all of the child's siblings and their children
-            count += count_siblings(GetHierarchy(h_, index)[2], h_, contour, true);
+            count += countSiblings(GetHierarchy(h_, index)[2], h_, contour, true);
             return count;
         }
 
@@ -171,7 +173,7 @@ namespace OCR
         }
 
         // Get the first parent of the contour that we care about
-        public int get_parent(int index, Mat h_)
+        public int getParent(int index, Mat h_)
         {
             int parent = GetHierarchy(h_, index)[3];
             while (parent > 0 && !keep(mContours[parent]))
@@ -183,29 +185,29 @@ namespace OCR
         }
 
         // Quick check to test if the contour is a child
-        public bool is_child(int index, Mat h_)
+        public bool isChild(int index, Mat h_)
         {
-            return (get_parent(index, h_) > 0);
+            return (getParent(index, h_) > 0);
         }
 
-        public bool include_box(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour)
+        public bool includeBox(int index, Mat h_, Emgu.CV.Util.VectorOfPoint contour)
         {
             Console.Write(index.ToString() + ":");
-            if (is_child(index, h_))
+            if (isChild(index, h_))
             {
                 Console.Write(" Is a child");
-                Console.Write(" parent " + get_parent(index, h_).ToString() + " has " + count_children(
-                    get_parent(index, h_), h_, contour).ToString() + " children");
-                Console.Write(" has " + count_children(index, h_, contour).ToString() + " children");
+                Console.Write(" parent " + getParent(index, h_).ToString() + " has " + countChildren(
+                    getParent(index, h_), h_, contour).ToString() + " children");
+                Console.Write(" has " + countChildren(index, h_, contour).ToString() + " children");
             }
 
-            if (is_child(index, h_) && count_children(get_parent(index, h_), h_, contour) <= 2)
+            if (isChild(index, h_) && countChildren(getParent(index, h_), h_, contour) <= 2)
             {
                 Console.WriteLine(" skipping: is an interior to a letter");
                 return false;
             }
 
-            if (count_children(index, h_, contour) > 2)
+            if (countChildren(index, h_, contour) > 2)
             {
                 Console.WriteLine(" skipping, is a container of letters");
                 return false;
@@ -252,7 +254,7 @@ namespace OCR
             for (int index = 0; index < mContours.Size; index++)
             {
                 Rectangle rect = CvInvoke.BoundingRectangle(mContours[index]);
-                if (keep(mContours[index]) && include_box(index, hierarchy, mContours[index]))
+                if (keep(mContours[index]) && includeBox(index, hierarchy, mContours[index]))
                 {
                     // It's a winner!
                     keepers.Push(mContours[index]);
@@ -267,13 +269,12 @@ namespace OCR
             }
 
             // Make a white copy of our image
-            Image<Bgr, Byte> new_image = blueEdges.ToImage<Bgr, Byte>();
-            new_image.SetValue(new MCvScalar(255, 255, 255));
+            Image<Bgr, Byte> newImage = blueEdges.ToImage<Bgr, Byte>();
+            newImage.SetValue(new MCvScalar(255, 255, 255));
 
             // For each box, find the foreground and background intensities
             for (int index = 0; index < keepers.Size; index++)
             {
-                //CvInvoke.DrawContours(new_image, keepers, index, new MCvScalar(0));
                 // Find the average intensity of the edge pixels to
                 // determine the foreground intensity
                 double foreground = 0;
@@ -347,20 +348,26 @@ namespace OCR
                         }
                         if (ii(new Point(x, y)) > foreground)
                         {
-                            new_image.Data[y, x, 0] = actBG;
-                            new_image.Data[y, x, 1] = actBG;
-                            new_image.Data[y, x, 2] = actBG;
+                            newImage.Data[y, x, 0] = actBG;
+                            newImage.Data[y, x, 1] = actBG;
+                            newImage.Data[y, x, 2] = actBG;
                         }
                         else
                         {
-                            new_image.Data[y, x, 0] = actFG;
-                            new_image.Data[y, x, 1] = actFG;
-                            new_image.Data[y, x, 2] = actFG;
+                            newImage.Data[y, x, 0] = actFG;
+                            newImage.Data[y, x, 1] = actFG;
+                            newImage.Data[y, x, 2] = actFG;
                         }
                     }
                 }
             }
-            return new_image;
+            Console.WriteLine();
+            mTesseract = new Tesseract("Tesseract\\", "eng", OcrEngineMode.TesseractLstmCombined);
+            mTesseract.SetVariable("tessedit_char_whitelist", "ABCDEFGHIJKLMNOPQRSTUVWXYZ-1234567890");
+            mTesseract.SetImage(newImage);
+            Console.Write(mTesseract.GetUNLVText());
+
+            return newImage;
         }
     }
 }
