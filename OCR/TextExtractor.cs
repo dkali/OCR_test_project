@@ -64,10 +64,10 @@ namespace OCR
                 unsafe
                 {
                     //return *((Int32*)Hierarchy.DataPointer.ToPointer() + offset);
-                    ret[0] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset0);
-                    ret[1] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset1);
-                    ret[2] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset2);
-                    ret[3] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset3);
+                    ret[0] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset0); // next
+                    ret[1] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset1); // previous
+                    ret[2] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset2); // first child
+                    ret[3] = *((Int32*)Hierarchy.DataPointer.ToPointer() + offset3); // parent
                 }
             }
             //else
@@ -175,13 +175,7 @@ namespace OCR
         // Get the first parent of the contour that we care about
         public int getParent(int index, Mat h_)
         {
-            int parent = GetHierarchy(h_, index)[3];
-            while (parent > 0 && !keep(mContours[parent]))
-            {
-                parent = GetHierarchy(h_, parent)[3];
-            }
-
-            return parent;
+            return GetHierarchy(h_, index)[3];
         }
 
         // Quick check to test if the contour is a child
@@ -249,11 +243,10 @@ namespace OCR
             // These are the boxes that we are determining
             Emgu.CV.Util.VectorOfVectorOfPoint keepers = new Emgu.CV.Util.VectorOfVectorOfPoint();
 
-            // For each contour, find the bounding rectangle and decide
+            // For each contour decide
             // if it's one we care about
             for (int index = 0; index < mContours.Size; index++)
             {
-                Rectangle rect = CvInvoke.BoundingRectangle(mContours[index]);
                 if (keep(mContours[index]) && includeBox(index, hierarchy, mContours[index]))
                 {
                     // It's a winner!
